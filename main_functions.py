@@ -1,4 +1,6 @@
 import re
+import pandas as pd
+from sklearn import preprocessing as pp
 
 # List of words to remove
 words_to_remove = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
@@ -16,3 +18,10 @@ def contains_any_word(row):
     return any(
         re.search(pattern, str(row[col]), re.IGNORECASE) for col in columns_to_check
     )
+# Function to replace missing data or drop entries with missing data
+def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
+    return df
+
+# Function to scale all columns of dataframe assuming the dataframe is preprocessed
+def scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:
+    return df
