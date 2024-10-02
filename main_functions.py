@@ -16,3 +16,4 @@ def contains_any_word(row):
     return any(
         re.search(pattern, str(row[col]), re.IGNORECASE) for col in columns_to_check
     )
+
