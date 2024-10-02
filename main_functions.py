@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from sklearn import preprocessing as pp
 from sklearn.decomposition import PCA
+from sklearn.neighbors import LocalOutlierFactor
 import re
 
 # List of words to remove
@@ -9,6 +10,30 @@ inappropriate_words = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
 
 # List of columns to check
 columns_to_check = ["Genres", "Categories", "Tags", "Notes", "About the game"]
+
+def get_set_of_all_genres(df: pd.DataFrame):
+    genres = []
+    for genre in df["Genres"].unique().tolist():
+        genres.extend(genre.split(","))
+    return set(genres)
+
+# by this point, the df most be out of missing values
+def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
+    # only keep columns with numerical data
+    df_numeric = df.select_dtypes(exclude=['object'])
+
+    # broad outliers detection
+    clf = LocalOutlierFactor(n_neighbors=n_neighbors)
+    df_filtered = clf.fit_predict(df_numeric)
+    df = df[df_filtered != -1]
+
+    # specific outliers detection
+    # remove any game that happens to have all the possible genres
+    all_genres = get_set_of_all_genres(df)
+    df_filtered = df.apply(lambda row: set(row["Genres"].split(',')) == all_genres , axis=1)
+    df = df[~df_filtered]
+
+    return df
 
 
 # Function to filter out rows containing any exact word in the specified columns
