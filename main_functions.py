@@ -49,6 +49,10 @@ def contains_inappropriate_word(row):
     )
 
 
+# Function to remove rows that we do not consider a game
+def remove_non_games(df: pd.DataFrame) -> pd.DataFrame:
+    return df
+
 # Function to replace missing data or drop entries with missing data
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     # Remove any games not worth lookin at (Don't have relevant info)
