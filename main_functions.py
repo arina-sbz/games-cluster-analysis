@@ -4,6 +4,8 @@ from sklearn import preprocessing as pp
 from sklearn.decomposition import PCA
 from sklearn.neighbors import LocalOutlierFactor
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # List of words to remove
 inappropriate_words = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
@@ -13,15 +15,20 @@ columns_to_check = ["Genres", "Categories", "Tags", "Notes", "About the game"]
 
 def get_set_of_all_genres(df: pd.DataFrame):
     genres = []
-    for genre in df["Genres"].unique().tolist():
+    for genre in df["Genres"].astype(str).unique().tolist():
         genres.extend(genre.split(","))
     return set(genres)
 
 # by this point, the df most be out of missing values
 def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
     # only keep columns with numerical data
-    df_numeric = df.select_dtypes(exclude=['object'])
-
+    df_numeric = df[['Peak CCU', 'Required age', 'Price', 'DLC count', 'Windows', 'Mac',
+       'Linux', 'Metacritic score', 'User score', 'Positive', 'Negative',
+       'Recommendations', 'Average playtime forever',
+       'Average playtime two weeks', 'Median playtime forever',
+       'Median playtime two weeks']]
+    
+    result = df_numeric.columns[df_filtered.isna().any()].tolist()
     # broad outliers detection
     clf = LocalOutlierFactor(n_neighbors=n_neighbors)
     df_filtered = clf.fit_predict(df_numeric)
@@ -99,7 +106,6 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
 # Function to scale all columns of dataframe assuming the dataframe is preprocessed
 def scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:
-
     # Apply StandardScaler to all columns
     if method == "standard":
         # Initialize StandardScaler
@@ -128,7 +134,7 @@ def scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:
 
 
 # PCA function
-def implement_PCA(df, features):
+def implement_PCA(df, features) -> tuple:
     # df should be scaled before implementing PCA
     # PCA does not accept Nan values
     # features should be either int or float
