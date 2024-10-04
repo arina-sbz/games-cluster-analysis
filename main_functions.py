@@ -35,7 +35,6 @@ def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
 
     return df
 
-
 # Function to filter out rows containing any exact word in the specified columns
 def contains_inappropriate_word(row):
     # Create a regex pattern that matches the exact words using word boundaries (\b)
@@ -48,9 +47,19 @@ def contains_inappropriate_word(row):
         re.search(pattern, str(row[col]), re.IGNORECASE) for col in columns_to_check
     )
 
-
 # Function to remove rows that we do not consider a game
 def remove_non_games(df: pd.DataFrame) -> pd.DataFrame:
+    # Remove any row where Genres or Tags field contains the string Utilities
+    df = df[~df['Genres'].str.contains("Utilities")]
+    df = df[~df['Tags'].str.contains("Utilities")]
+    df = df[~df['Categories'].str.contains("Utilities")]
+
+    # When running get_set_of_all_genres on only entries without singlepplayer/multiplazer in categories we will keep only the ones that are actually games
+    actual_game_genres = ["Action", "Adventure", "RPG", "Racing", "Sports", "Strategy"]
+
+    # Remove any row where categroy is neither single player/multiplayer and genre not game genre
+    df = df[df['Categories'].str.contains("Single-player") | df['Categories'].str.contains("Multi-player") | df["Genres"].str.contains("|".join(actual_game_genres))]
+
     return df
 
 # Function to replace missing data or drop entries with missing data
@@ -61,8 +70,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "About the game",
         "Screenshots",
         "Genres",
-        "Developers",
-        "Categories",
+        "Developers"
     ]
     df.dropna(subset=drop_na_attributes, inplace=True)
 
@@ -72,7 +80,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
     df["Tags"] = df["Tags"].fillna("")
 
-    # Should all be removed anyway before because not useful
+    # Should all be removed anyway before because not useful (besides Categories)
     replace_na_attributes = [
         "Reviews",
         "Support url",
@@ -82,6 +90,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "Score rank",
         "Notes",
         "Movies",
+        "Categories"
     ]
     df[replace_na_attributes] = df[replace_na_attributes].fillna("")
 
