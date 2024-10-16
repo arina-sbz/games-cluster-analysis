@@ -13,21 +13,38 @@ inappropriate_words = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
 # List of columns to check
 columns_to_check = ["Genres", "Categories", "Tags", "Notes", "About the game"]
 
+
 def get_set_of_all_genres(df: pd.DataFrame):
     genres = []
     for genre in df["Genres"].astype(str).unique().tolist():
         genres.extend(genre.split(","))
     return set(genres)
 
+
 # by this point, the df most be out of missing values
-def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
+def remove_outliers(df: pd.DataFrame, n_neighbors=20):
     # only keep columns with numerical data
-    df_numeric = df[['Peak CCU', 'Required age', 'Price', 'DLC count', 'Windows', 'Mac',
-       'Linux', 'Metacritic score', 'User score', 'Positive', 'Negative',
-       'Recommendations', 'Average playtime forever',
-       'Average playtime two weeks', 'Median playtime forever',
-       'Median playtime two weeks']]
-    
+    df_numeric = df[
+        [
+            "Peak CCU",
+            "Required age",
+            "Price",
+            "DLC count",
+            "Windows",
+            "Mac",
+            "Linux",
+            "Metacritic score",
+            "User score",
+            "Positive",
+            "Negative",
+            "Recommendations",
+            "Average playtime forever",
+            "Average playtime two weeks",
+            "Median playtime forever",
+            "Median playtime two weeks",
+        ]
+    ]
+
     result = df_numeric.columns[df_filtered.isna().any()].tolist()
     # broad outliers detection
     clf = LocalOutlierFactor(n_neighbors=n_neighbors)
@@ -37,10 +54,13 @@ def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
     # specific outliers detection
     # remove any game that happens to have all the possible genres
     all_genres = get_set_of_all_genres(df)
-    df_filtered = df.apply(lambda row: set(row["Genres"].split(',')) == all_genres , axis=1)
+    df_filtered = df.apply(
+        lambda row: set(row["Genres"].split(",")) == all_genres, axis=1
+    )
     df = df[~df_filtered]
 
     return df
+
 
 # Function to filter out rows containing any exact word in the specified columns
 def contains_inappropriate_word(row):
@@ -54,20 +74,26 @@ def contains_inappropriate_word(row):
         re.search(pattern, str(row[col]), re.IGNORECASE) for col in columns_to_check
     )
 
+
 # Function to remove rows that we do not consider a game
 def remove_non_games(df: pd.DataFrame) -> pd.DataFrame:
     # Remove any row where Genres or Tags field contains the string Utilities
-    df = df[~df['Genres'].str.contains("Utilities")]
-    df = df[~df['Tags'].str.contains("Utilities")]
-    df = df[~df['Categories'].str.contains("Utilities")]
+    df = df[~df["Genres"].str.contains("Utilities")]
+    df = df[~df["Tags"].str.contains("Utilities")]
+    df = df[~df["Categories"].str.contains("Utilities")]
 
     # When running get_set_of_all_genres on only entries without singlepplayer/multiplazer in categories we will keep only the ones that are actually games
     actual_game_genres = ["Action", "Adventure", "RPG", "Racing", "Sports", "Strategy"]
 
     # Remove any row where categroy is neither single player/multiplayer and genre not game genre
-    df = df[df['Categories'].str.contains("Single-player") | df['Categories'].str.contains("Multi-player") | df["Genres"].str.contains("|".join(actual_game_genres))]
+    df = df[
+        df["Categories"].str.contains("Single-player")
+        | df["Categories"].str.contains("Multi-player")
+        | df["Genres"].str.contains("|".join(actual_game_genres))
+    ]
 
     return df
+
 
 # Function to replace missing data or drop entries with missing data
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
@@ -77,7 +103,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "About the game",
         "Screenshots",
         "Genres",
-        "Developers"
+        "Developers",
     ]
     df.dropna(subset=drop_na_attributes, inplace=True)
 
@@ -97,7 +123,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "Score rank",
         "Notes",
         "Movies",
-        "Categories"
+        "Categories",
     ]
     df[replace_na_attributes] = df[replace_na_attributes].fillna("")
 
@@ -111,24 +137,18 @@ def scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:
         # Initialize StandardScaler
         scaler = pp.StandardScaler()
 
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
-
     # Apply MinMaxScaler to all columns
     elif method == "minmax":
         # Initialize MinMaxScaler
         scaler = pp.MinMaxScaler()
-
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
 
     # Apply RobustScaler to all columns
     elif method == "robust":
         # Initialize RobustScaler
         scaler = pp.RobustScaler()
 
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    # Fit and transform the dataframe
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns, index=df.index)
 
     return df
 
