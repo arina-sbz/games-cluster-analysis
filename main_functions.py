@@ -94,7 +94,7 @@ def remove_non_games(df: pd.DataFrame) -> pd.DataFrame:
     df = df[~df["Tags"].str.contains("Utilities")]
     df = df[~df["Categories"].str.contains("Utilities")]
 
-    # When running get_set_of_all_genres on only entries without singlepplayer/multiplazer in categories we will keep only the ones that are actually games
+    # When running get_set_of_all_genres on only entries without singlepplayer/multiplayer in categories we will keep only the ones that are actually games
     actual_game_genres = ["Action", "Adventure", "RPG", "Racing", "Sports", "Strategy"]
 
     # Remove any row where categroy is neither single player/multiplayer and genre not game genre
@@ -263,21 +263,6 @@ def add_review_columns(df):
     return df
 
 
-# Function to merge genres and tags
-# def merge_genres_tags(df):
-#     # Fill NaN values in 'Tags' and 'Genres' with an empty string
-#     df["Genres"] = df["Genres"].fillna("")
-#     df["Tags"] = df["Tags"].fillna("")
-
-#     # Merge 'Genres' and 'Tags' columns into a new column 'Genres_Tags'
-#     df["Genres_Tags"] = df.apply(
-#         lambda row: ",".join(set(row["Genres"].split(",") + row["Tags"].split(","))),
-#         axis=1,
-#     )
-
-#     return df
-
-
 # Function to add a column based on single player and multi player
 def add_player_type_numeric_column(df):
     # Create a new column 'player_type_numeric' based on presence of keywords in 'Categories'
@@ -312,26 +297,11 @@ def add_online_offline_column(df):
 
 
 # Clustering
-#  Implement DBSCAN clustering
+# Implement DBSCAN clustering
 def implement_DBSCAN(pca_components, eps_value):
     db_clustering = DBSCAN(eps=eps_value, min_samples=160)
     db_labels = db_clustering.fit_predict(pca_components)
     return db_labels
-
-
-# Show the elbow plot
-def elbow_plot(pca_components, k):
-    neigh = NearestNeighbors(n_neighbors=k)
-    neigh.fit(pca_components)
-    distances, _ = neigh.kneighbors(pca_components)
-    distances = np.sort(distances[:, k - 1])
-    plt.figure(figsize=(10, 6))
-    plt.plot(distances)
-    plt.xlabel("Points")
-    plt.ylabel(f"{k}-th nearest neighbor distance")
-    plt.title("K-distance Graph")
-    plt.show()
-    return distances
 
 
 # Choose best epsilon value for DBSCAN
