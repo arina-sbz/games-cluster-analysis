@@ -1,11 +1,16 @@
 import pandas as pd
+import numpy as np
 import re
 from sklearn import preprocessing as pp
 from sklearn.decomposition import PCA
 from sklearn.neighbors import LocalOutlierFactor
-import re
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.cluster import DBSCAN
+from sklearn.neighbors import NearestNeighbors
+from kneed import KneeLocator
+from mpl_toolkits.mplot3d import Axes3D
+
 
 # List of words to remove
 inappropriate_words = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
@@ -13,34 +18,61 @@ inappropriate_words = ["sex", "sexual content", "nudity", "hentai", "nsfw"]
 # List of columns to check
 columns_to_check = ["Genres", "Categories", "Tags", "Notes", "About the game"]
 
+
 def get_set_of_all_genres(df: pd.DataFrame):
     genres = []
     for genre in df["Genres"].astype(str).unique().tolist():
         genres.extend(genre.split(","))
     return set(genres)
 
+
 # by this point, the df most be out of missing values
-def remove_outliers(df: pd.DataFrame, n_neighbors = 20):
-    # only keep columns with numerical data
-    df_numeric = df[['Peak CCU', 'Required age', 'Price', 'DLC count', 'Windows', 'Mac',
-       'Linux', 'Metacritic score', 'User score', 'Positive', 'Negative',
-       'Recommendations', 'Average playtime forever',
-       'Average playtime two weeks', 'Median playtime forever',
-       'Median playtime two weeks']]
-    
-    result = df_numeric.columns[df_filtered.isna().any()].tolist()
+# Removing outliers
+def remove_outliers(
+    df: pd.DataFrame,
+    id_df: pd.DataFrame,
+    n_neighbors=20,
+):
+    df_numeric = df[
+        [
+            "Peak CCU",
+            "Required age",
+            "Price",
+            "DLC count",
+            "Windows",
+            "Mac",
+            "Linux",
+            "Metacritic score",
+            "User score",
+            "Positive",
+            "Negative",
+            "Recommendations",
+            "Average playtime forever",
+            "Average playtime two weeks",
+            "Median playtime forever",
+            "Median playtime two weeks",
+        ]
+    ]
+
     # broad outliers detection
     clf = LocalOutlierFactor(n_neighbors=n_neighbors)
     df_filtered = clf.fit_predict(df_numeric)
     df = df[df_filtered != -1]
+    id_df = id_df[df_filtered != -1]
+
+    all_genres = get_set_of_all_genres(df)
+
+    # for checking if a game has all genres
+    def func(row):
+        return set(str(row["Genres"]).split(",")) == all_genres
 
     # specific outliers detection
     # remove any game that happens to have all the possible genres
-    all_genres = get_set_of_all_genres(df)
-    df_filtered = df.apply(lambda row: set(row["Genres"].split(',')) == all_genres , axis=1)
+    df_filtered = df.apply(func, axis=1)
     df = df[~df_filtered]
+    id_df = id_df[~df_filtered]
+    return df, id_df
 
-    return df
 
 # Function to filter out rows containing any exact word in the specified columns
 def contains_inappropriate_word(row):
@@ -54,20 +86,26 @@ def contains_inappropriate_word(row):
         re.search(pattern, str(row[col]), re.IGNORECASE) for col in columns_to_check
     )
 
+
 # Function to remove rows that we do not consider a game
 def remove_non_games(df: pd.DataFrame) -> pd.DataFrame:
     # Remove any row where Genres or Tags field contains the string Utilities
-    df = df[~df['Genres'].str.contains("Utilities")]
-    df = df[~df['Tags'].str.contains("Utilities")]
-    df = df[~df['Categories'].str.contains("Utilities")]
+    df = df[~df["Genres"].str.contains("Utilities")]
+    df = df[~df["Tags"].str.contains("Utilities")]
+    df = df[~df["Categories"].str.contains("Utilities")]
 
-    # When running get_set_of_all_genres on only entries without singlepplayer/multiplazer in categories we will keep only the ones that are actually games
+    # When running get_set_of_all_genres on only entries without singlepplayer/multiplayer in categories we will keep only the ones that are actually games
     actual_game_genres = ["Action", "Adventure", "RPG", "Racing", "Sports", "Strategy"]
 
     # Remove any row where categroy is neither single player/multiplayer and genre not game genre
-    df = df[df['Categories'].str.contains("Single-player") | df['Categories'].str.contains("Multi-player") | df["Genres"].str.contains("|".join(actual_game_genres))]
+    df = df[
+        df["Categories"].str.contains("Single-player")
+        | df["Categories"].str.contains("Multi-player")
+        | df["Genres"].str.contains("|".join(actual_game_genres))
+    ]
 
     return df
+
 
 # Function to replace missing data or drop entries with missing data
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
@@ -77,7 +115,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "About the game",
         "Screenshots",
         "Genres",
-        "Developers"
+        "Developers",
     ]
     df.dropna(subset=drop_na_attributes, inplace=True)
 
@@ -97,7 +135,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         "Score rank",
         "Notes",
         "Movies",
-        "Categories"
+        "Categories",
     ]
     df[replace_na_attributes] = df[replace_na_attributes].fillna("")
 
@@ -111,24 +149,18 @@ def scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:
         # Initialize StandardScaler
         scaler = pp.StandardScaler()
 
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
-
     # Apply MinMaxScaler to all columns
     elif method == "minmax":
         # Initialize MinMaxScaler
         scaler = pp.MinMaxScaler()
-
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
 
     # Apply RobustScaler to all columns
     elif method == "robust":
         # Initialize RobustScaler
         scaler = pp.RobustScaler()
 
-        # Fit and transform the dataframe
-        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    # Fit and transform the dataframe
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns, index=df.index)
 
     return df
 
@@ -161,41 +193,7 @@ def implement_PCA(df, features) -> tuple:
     return pca_components, loadings
 
 
-def plot_PCA(components):
-    fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(111, projection="3d")
-
-    scatter = ax.scatter(
-        components[:, 0],
-        components[:, 1],
-        components[:, 2],
-        c=components[:, 2],
-        cmap="plasma",
-        s=60,
-        alpha=0.7,
-        edgecolors="k",
-    )
-
-    cbar = fig.colorbar(scatter, ax=ax, shrink=0.5, aspect=5)
-    cbar.set_label("PC 3 Value", fontsize=12)
-
-    # Set labels and title
-    ax.set_xlabel("PC1", fontsize=12)
-    ax.set_ylabel("PC2", fontsize=12)
-    ax.set_zlabel("PC3", fontsize=12)
-    ax.set_title(
-        "3D PCA Plot of Steam Games Data (First Three Components)", fontsize=11
-    )
-
-    # Adjust viewing angle for better perspective
-    ax.view_init(elev=25, azim=40)  # Change angles as needed
-
-    plt.gcf().subplots_adjust(left=0.45)
-
-    # Show the plot
-    plt.show()
-
-
+# Function to add release season
 def add_release_season_column(df, date_column="Release date"):
     # Ensure the date column is in datetime format
     df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
@@ -225,6 +223,7 @@ def add_release_season_column(df, date_column="Release date"):
     return df
 
 
+# Function to convert estimated owners to midpoints
 def convert_estimated_owners_to_midpoints(df, column="Estimated owners"):
 
     # Define a function to calculate midpoints of ranges
@@ -241,6 +240,7 @@ def convert_estimated_owners_to_midpoints(df, column="Estimated owners"):
     return df
 
 
+# Function to add positive ratio and total reviews
 def add_review_columns(df):
     # Fill NaN values in 'Positive' and 'Negative' columns with 0
     df["Positive"] = df["Positive"].fillna(0)
@@ -263,20 +263,7 @@ def add_review_columns(df):
     return df
 
 
-def merge_genres_tags(df):
-    # Fill NaN values in 'Tags' and 'Genres' with an empty string
-    df["Genres"] = df["Genres"].fillna("")
-    df["Tags"] = df["Tags"].fillna("")
-
-    # Merge 'Genres' and 'Tags' columns into a new column 'Genres_Tags'
-    df["Genres_Tags"] = df.apply(
-        lambda row: ",".join(set(row["Genres"].split(",") + row["Tags"].split(","))),
-        axis=1,
-    )
-
-    return df
-
-
+# Function to add a column based on single player and multi player
 def add_player_type_numeric_column(df):
     # Create a new column 'player_type_numeric' based on presence of keywords in 'Categories'
     def check_player_type(categories):
@@ -300,10 +287,56 @@ def add_player_type_numeric_column(df):
     return df
 
 
+# Function to add a column called online-offline
 def add_online_offline_column(df):
-    # Create a new column 'online_offline' with values:
     # 1 for Online games, 0 for Offline games based on the presence of 'online' in 'Categories'
     df["online_offline"] = df["Categories"].apply(
         lambda x: 1 if isinstance(x, str) and "online" in x.lower() else 0
     )
     return df
+
+
+# Clustering
+# Implement DBSCAN clustering
+def implement_DBSCAN(pca_components, eps_value):
+    db_clustering = DBSCAN(eps=eps_value, min_samples=160)
+    db_labels = db_clustering.fit_predict(pca_components)
+    return db_labels
+
+
+# Choose best epsilon value for DBSCAN
+def choose_best_eps(distances):
+    kneedle = KneeLocator(
+        range(len(distances)), distances, curve="convex", direction="increasing"
+    )
+    optimal_eps = round(distances[kneedle.elbow], 2)
+
+    print(f"Optimal value for epsilon: {optimal_eps}")
+    return optimal_eps
+
+
+# Function to assign a score to each cluster based on the columns (positive columns mean the greater the better and negative columns mean the smaller the better)
+def scoring_clusters(cluster_means):
+    postive_score_cols = [
+        "Peak CCU",
+        "DLC count",
+        "Metacritic score",
+        "Positive",
+        "User score",
+        "Recommendations",
+        "Average playtime forever",
+        "Average playtime two weeks",
+        "Median playtime forever",
+        "Median playtime two weeks",
+        "total_reviews",
+        "positive_ratio",
+    ]
+    negative_score_cols = ["Negative"]
+    cluster_scores = [0, 0, 0, 0]
+    for col in postive_score_cols:
+        index_max = np.argmax(cluster_means[col])
+        cluster_scores[index_max] += 1
+
+    index_min = np.argmin(cluster_means[negative_score_cols])
+    cluster_scores[index_min] += 1
+    return cluster_scores
