@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
+from sklearn.neighbors import NearestNeighbors
 
 
 # Show PCA plot based on first three components
@@ -85,6 +86,21 @@ def plot_dbscan(pca_components, labels):
     plt.savefig("dbscan", dpi=300, bbox_inches="tight")
     # Show the plot
     plt.show()
+
+
+# Show the elbow plot
+def elbow_plot(pca_components, k):
+    neigh = NearestNeighbors(n_neighbors=k)
+    neigh.fit(pca_components)
+    distances, _ = neigh.kneighbors(pca_components)
+    distances = np.sort(distances[:, k - 1])
+    plt.figure(figsize=(10, 6))
+    plt.plot(distances)
+    plt.xlabel("Points")
+    plt.ylabel(f"{k}-th nearest neighbor distance")
+    plt.title("K-distance Graph")
+    plt.show()
+    return distances
 
 
 def plot_unappropriate_entries():
